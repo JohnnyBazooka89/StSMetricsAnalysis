@@ -896,6 +896,7 @@ try:
                     "DELETE FROM damage_taken where run_file_path = %s",
                     (absPath,),
                 )
+                conn.commit()
                 for damageTakenEntry in runJson["event"]["damage_taken"]:
                     if damageTakenEntry["damage"] >= 99999:
                         continue
@@ -912,6 +913,7 @@ try:
                     "DELETE FROM killed_by where run_file_path = %s",
                     (absPath,),
                 )
+                conn.commit()
                 if "killed_by" in runJson["event"]:
                     enemyKilling = runJson["event"]["killed_by"]
                     cur.execute(
@@ -923,6 +925,7 @@ try:
                     "DELETE FROM card_choice where run_file_path = %s",
                     (absPath,),
                 )
+                conn.commit()
                 for cardChoice in runJson["event"]["card_choices"]:
                     cardPicked = cardChoice["picked"]
                     cur.execute(
@@ -939,6 +942,7 @@ try:
                     "DELETE FROM master_deck where run_file_path = %s",
                     (absPath,),
                 )
+                conn.commit()
                 masterDeck = runJson["event"]["master_deck"]
                 masterDeckGrouped = {}
                 for card in masterDeck:
@@ -951,6 +955,7 @@ try:
                     "DELETE FROM relic where run_file_path = %s",
                     (absPath,),
                 )
+                conn.commit()
                 relics = runJson["event"]["relics"]
                 for relicId in relics:
                     cur.execute(

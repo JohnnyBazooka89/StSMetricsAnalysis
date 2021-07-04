@@ -74,3 +74,8 @@ CREATE INDEX idx_killed_by_enemy_id ON killed_by(enemy_id);
 CREATE INDEX idx_card_choice_card_id ON card_choice(card_id);
 CREATE INDEX idx_master_deck_card_id ON master_deck(card_id);
 CREATE INDEX idx_relic_relic_id ON relic(relic_id);
+CREATE INDEX idx_damage_taken_run_file_path ON damage_taken(run_file_path);
+CREATE INDEX idx_killed_by_run_file_path ON killed_by(run_file_path);
+CREATE INDEX idx_card_choice_run_file_path ON card_choice(run_file_path);
+CREATE INDEX idx_master_deck_run_file_path ON master_deck(run_file_path);
+CREATE INDEX idx_relic_run_file_path ON relic(run_file_path);
