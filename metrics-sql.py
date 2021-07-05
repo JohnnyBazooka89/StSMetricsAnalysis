@@ -798,7 +798,7 @@ try:
                     conn.commit()
 
     if PROCESS_RUNS:
-        cur.execute("SELECT file_path FROM run WHERE status = 'NEW'")
+        cur.execute("SELECT file_path FROM run WHERE status = 'NEW' order by file_path")
         rows = cur.fetchall()
         for row in rows:
             absPath = row[0]
@@ -904,9 +904,11 @@ try:
                         continue
                     enemies = damageTakenEntry["enemies"]
                     damage = damageTakenEntry["damage"]
+                    floor = damageTakenEntry["floor"]
+                    turns = damageTakenEntry["turns"]
                     cur.execute(
-                        "INSERT INTO damage_taken(run_file_path, enemies, damage) VALUES (%s, %s, %s)",
-                        (absPath, enemies, damage),
+                        "INSERT INTO damage_taken(run_file_path, enemies, damage, floor, turns) VALUES (%s, %s, %s, %s, %s)",
+                        (absPath, enemies, damage, floor, turns),
                     )
                 conn.commit()
                 cur.execute(
