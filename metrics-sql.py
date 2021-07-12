@@ -735,7 +735,11 @@ def getKilledBy(asc, character):
 
 def getSwappedStarterRelic(asc, character):
     cur.execute(
-        """SELECT count(*), count(*) filter (where neow_bonus = 'BOSS_RELIC'), count(*) filter (where neow_bonus = 'BOSS_RELIC' and victory = true), count(*) filter (where neow_bonus = 'BOSS_RELIC' and victory = false), count(*) filter (where victory = true), count(*) filter (where victory = false)
+        """SELECT count(*), count(*) filter (where neow_bonus = 'BOSS_RELIC'), 
+        count(*) filter (where neow_bonus = 'BOSS_RELIC' and victory = true), 
+        count(*) filter (where neow_bonus = 'BOSS_RELIC' and victory = false), 
+        count(*) filter (where victory = true), 
+        count(*) filter (where victory = false)
         FROM run r
         WHERE status = 'PROCESSED' and (ascension = %(asc)s or %(asc)s = '') and (character = %(character)s or %(character)s = '')""",
         {"asc": emptyStringIfNone(asc), "character": emptyStringIfNone(character)},
