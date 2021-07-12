@@ -12,8 +12,8 @@ METRICS_PATH = "D:\\metrics_runs\\minty_runs"
 CHARACTER_CARD_PREFIX = ""
 RELIC_PREFIX = ""
 
-FIND_NEW_RUNS_TO_PROCESS = True
-PROCESS_RUNS = True
+FIND_NEW_RUNS_TO_PROCESS = False
+PROCESS_RUNS = False
 SKIP_ENDLESS_RUNS = True
 AVERAGE_DAMAGE_TAKEN_COUNT_THRESHOLD = 5
 CARD_CHOICES_CARDS_THRESHOLD = 5
@@ -495,6 +495,18 @@ def printLanguage(hosts):
     print()
 
 
+def printActsVisited(actsVisited):
+    for key, value in sorted(actsVisited.items(), key=lambda e: -e[1]):
+        print(str(key) + " -> " + str(value))
+    print()
+
+
+def printEnabledMods(modsEnabled):
+    for key, value in sorted(modsEnabled.items(), key=lambda e: -e[1]):
+        print(str(key) + " -> " + str(value))
+    print()
+
+
 def emptyStringIfNone(string):
     return string if string else ""
 
@@ -780,6 +792,38 @@ def getLanguage(asc, character):
     return results
 
 
+def getActsVisited(asc, character):
+    cur.execute(
+        """SELECT act_name, count(*) as c 
+        FROM act_visited av 
+        LEFT JOIN run r ON av.run_file_path = r.file_path
+        WHERE status = 'PROCESSED' and (ascension = %(asc)s or %(asc)s = '') and (character = %(character)s or %(character)s = '')
+        GROUP BY act_name""",
+        {"asc": emptyStringIfNone(asc), "character": emptyStringIfNone(character)},
+    )
+    rows = cur.fetchall()
+    results = {}
+    for row in rows:
+        results[row[0]] = row[1]
+    return results
+
+
+def getEnabledMods(asc, character):
+    cur.execute(
+        """SELECT mod_name, count(*) as c 
+        FROM mod m 
+        LEFT JOIN run r ON m.run_file_path = r.file_path
+        WHERE status = 'PROCESSED' and (ascension = %(asc)s or %(asc)s = '') and (character = %(character)s or %(character)s = '')
+        GROUP BY mod_name""",
+        {"asc": emptyStringIfNone(asc), "character": emptyStringIfNone(character)},
+    )
+    rows = cur.fetchall()
+    results = {}
+    for row in rows:
+        results[row[0]] = row[1]
+    return results
+
+
 conn = None
 
 try:
@@ -971,7 +1015,11 @@ try:
                     (absPath,),
                 )
                 conn.commit()
-                actsVisited = runJson["event"]["acts_visited"] if "acts_visited" in runJson["event"] else ["no_acts_visited_data"]
+                actsVisited = (
+                    runJson["event"]["acts_visited"]
+                    if "acts_visited" in runJson["event"]
+                    else ["no_acts_visited_data"]
+                )
                 for actName in actsVisited:
                     cur.execute(
                         "INSERT INTO act_visited(run_file_path, act_name) VALUES (%s, %s)",
@@ -984,7 +1032,11 @@ try:
                     (absPath,),
                 )
                 conn.commit()
-                mods = runJson["event"]["mods"] if "mods" in runJson["event"] else ["no_mods_data"]
+                mods = (
+                    runJson["event"]["mods"]
+                    if "mods" in runJson["event"]
+                    else ["no_mods_data"]
+                )
                 for modName in mods:
                     cur.execute(
                         "INSERT INTO mod(run_file_path, mod_name) VALUES (%s, %s)",
@@ -1592,6 +1644,63 @@ try:
                             + ":"
                         )
                         printLanguage(getLanguage(asc, character))
+
+    with open("report/21_acts_visited.txt", "w") as f, redirect_stdout(f):
+        print("Acts visited on all ascensions:")
+        printActsVisited(getActsVisited(None, None))
+        for ascInt in onlyTheHighestAscension:
+            asc = str(ascInt)
+            print("Acts visited on ascension " + str(asc) + ":")
+            printActsVisited(getActsVisited(asc, None))
+        if len(characterKeys) > 1:
+            with open(
+                "report/21_acts_visited_by_characters.txt", "w"
+            ) as f, redirect_stdout(f):
+                for character in sorted(characterKeys):
+                    print(
+                        "Acts visited on character " + character + " on all ascensions:"
+                    )
+                    printActsVisited(getActsVisited(None, character))
+                    for ascInt in onlyTheHighestAscension:
+                        asc = str(ascInt)
+                        print(
+                            "Acts visited on character "
+                            + character
+                            + " on ascension "
+                            + str(asc)
+                            + ":"
+                        )
+                        printActsVisited(getActsVisited(asc, character))
+
+    with open(
+        "report/22_enabled_mods.txt", "w", encoding="utf-8"
+    ) as f, redirect_stdout(f):
+        print("Enabled mods on all ascensions:")
+        printEnabledMods(getEnabledMods(None, None))
+        for ascInt in onlyTheHighestAscension:
+            asc = str(ascInt)
+            print("Enabled mods on ascension " + str(asc) + ":")
+            printEnabledMods(getEnabledMods(asc, None))
+        if len(characterKeys) > 1:
+            with open(
+                "report/22_enabled_mods_by_characters.txt", "w", encoding="utf-8"
+            ) as f, redirect_stdout(f):
+                for character in sorted(characterKeys):
+                    print(
+                        "Enabled mods on character " + character + " on all ascensions:"
+                    )
+                    printEnabledMods(getEnabledMods(None, character))
+                    for ascInt in onlyTheHighestAscension:
+                        asc = str(ascInt)
+                        print(
+                            "Enabled mods on character "
+                            + character
+                            + " on ascension "
+                            + str(asc)
+                            + ":"
+                        )
+                        printEnabledMods(getEnabledMods(asc, character))
+
 
 except Exception as e:
     print(traceback.format_exc())
