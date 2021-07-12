@@ -81,7 +81,6 @@ CREATE TABLE mod(
 
 CREATE INDEX idx_run_ascension ON run(ascension);
 CREATE INDEX idx_run_character ON run(character);
-CREATE INDEX idx_run_file_path ON run(file_path);
 CREATE INDEX idx_damage_taken_enemies ON damage_taken(enemies);
 CREATE INDEX idx_killed_by_enemy_id ON killed_by(enemy_id);
 CREATE INDEX idx_card_choice_card_id ON card_choice(card_id);
