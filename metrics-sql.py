@@ -514,7 +514,7 @@ def getWinRatio(asc, character, victory):
 
 def getAverageLength(asc, character, victory):
     cur.execute(
-        """SELECT coalesce(sum(play_time::int), 0), count(*) FROM run 
+        """SELECT sum(play_time::int), count(*) FROM run 
         WHERE status = 'PROCESSED' and (ascension = %(asc)s or %(asc)s = '') and (character = %(character)s or %(character)s = '') AND victory = %(victory)s""",
         {
             "asc": emptyStringIfNone(asc),
@@ -830,7 +830,7 @@ try:
                 victory = runJson["event"]["victory"]
                 playTime = runJson["event"]["playtime"]
                 neowBonus = runJson["event"]["neow_bonus"]
-                time = runJson["time"]
+                runTime = runJson["time"]
                 floor_reached = runJson["event"]["floor_reached"]
                 score = runJson["event"]["score"]
                 play_id = runJson["event"]["play_id"]
@@ -866,7 +866,7 @@ try:
                         victory,
                         playTime,
                         neowBonus,
-                        time,
+                        runTime,
                         floor_reached,
                         score,
                         play_id,
