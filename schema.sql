@@ -58,13 +58,25 @@ CREATE TABLE card_choice(
 CREATE TABLE master_deck(
     run_file_path varchar,
     card_id varchar,
-    CONSTRAINT fk_card_choice_run_file_path FOREIGN KEY(run_file_path) REFERENCES run(file_path)
+    CONSTRAINT fk_master_deck_run_file_path FOREIGN KEY(run_file_path) REFERENCES run(file_path)
 );
 
 CREATE TABLE relic(
     run_file_path varchar,
     relic_id varchar,
-    CONSTRAINT fk_card_choice_run_file_path FOREIGN KEY(run_file_path) REFERENCES run(file_path)
+    CONSTRAINT fk_relic_run_file_path FOREIGN KEY(run_file_path) REFERENCES run(file_path)
+);
+
+CREATE TABLE act_visited(
+    run_file_path varchar,
+    act_name varchar,
+    CONSTRAINT fk_act_visited_run_file_path FOREIGN KEY(run_file_path) REFERENCES run(file_path)
+);
+
+CREATE TABLE mod(
+    run_file_path varchar,
+    mod_name varchar,
+    CONSTRAINT fk_mod_run_file_path FOREIGN KEY(run_file_path) REFERENCES run(file_path)
 );
 
 CREATE INDEX idx_run_ascension ON run(ascension);
@@ -74,8 +86,12 @@ CREATE INDEX idx_killed_by_enemy_id ON killed_by(enemy_id);
 CREATE INDEX idx_card_choice_card_id ON card_choice(card_id);
 CREATE INDEX idx_master_deck_card_id ON master_deck(card_id);
 CREATE INDEX idx_relic_relic_id ON relic(relic_id);
+CREATE INDEX idx_act_visited_act_name ON act_visited(act_name);
+CREATE INDEX idx_mod_mod_name ON mod(mod_name);
 CREATE INDEX idx_damage_taken_run_file_path ON damage_taken(run_file_path);
 CREATE INDEX idx_killed_by_run_file_path ON killed_by(run_file_path);
 CREATE INDEX idx_card_choice_run_file_path ON card_choice(run_file_path);
 CREATE INDEX idx_master_deck_run_file_path ON master_deck(run_file_path);
 CREATE INDEX idx_relic_run_file_path ON relic(run_file_path);
+CREATE INDEX idx_act_visited_run_file_path ON act_visited(run_file_path);
+CREATE INDEX idx_mod_run_file_path ON mod(run_file_path);

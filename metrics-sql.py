@@ -514,7 +514,7 @@ def getWinRatio(asc, character, victory):
 
 def getAverageLength(asc, character, victory):
     cur.execute(
-        """SELECT sum(play_time::int), count(*) FROM run 
+        """SELECT coalesce(sum(play_time::int), 0), count(*) FROM run 
         WHERE status = 'PROCESSED' and (ascension = %(asc)s or %(asc)s = '') and (character = %(character)s or %(character)s = '') AND victory = %(victory)s""",
         {
             "asc": emptyStringIfNone(asc),
@@ -963,6 +963,32 @@ try:
                     cur.execute(
                         "INSERT INTO relic(run_file_path, relic_id) VALUES (%s, %s)",
                         (absPath, relicId),
+                    )
+                conn.commit()
+
+                cur.execute(
+                    "DELETE FROM act_visited where run_file_path = %s",
+                    (absPath,),
+                )
+                conn.commit()
+                actsVisited = runJson["event"]["acts_visited"] if "acts_visited" in runJson["event"] else ["no_acts_visited_data"]
+                for actName in actsVisited:
+                    cur.execute(
+                        "INSERT INTO act_visited(run_file_path, act_name) VALUES (%s, %s)",
+                        (absPath, actName),
+                    )
+                conn.commit()
+
+                cur.execute(
+                    "DELETE FROM mod where run_file_path = %s",
+                    (absPath,),
+                )
+                conn.commit()
+                mods = runJson["event"]["mods"] if "mods" in runJson["event"] else ["no_mods_data"]
+                for modName in mods:
+                    cur.execute(
+                        "INSERT INTO mod(run_file_path, mod_name) VALUES (%s, %s)",
+                        (absPath, modName),
                     )
                 conn.commit()
 
