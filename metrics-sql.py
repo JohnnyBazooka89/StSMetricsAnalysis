@@ -19,7 +19,6 @@ AVERAGE_DAMAGE_TAKEN_COUNT_THRESHOLD = 5
 CARD_CHOICES_CARDS_THRESHOLD = 5
 CHARACTER_GAMES_THRESHOLD = 5
 WIN_RATIO_CARDS_THRESHOLD = 5
-# WIN_RATIO_GROUP_UPGRADED_AND_NOT_UPGRADED = False #TODO: implement this in SQL version
 WIN_RATIO_RELICS_THRESHOLD = 5
 HOSTS_THRESHOLD = 0
 
@@ -578,15 +577,20 @@ def getAverageGoldGained(asc, character, victory):
     return {"sum": sum, "count": count}
 
 
-def getCardChoices(asc, character):
+def getCardChoices(asc, character, upgradedCardsGrouped):
     cur.execute(
-        """SELECT card_id, picked, count(*) 
+        """SELECT CASE WHEN %(upgradedCardsGrouped)s = false THEN card_id ELSE regexp_replace(card_id, '\+.*', '') END card_id_calc,
+        picked, count(*) 
         FROM card_choice c 
         LEFT JOIN run r
         ON (c.run_file_path = r.file_path)
         WHERE status = 'PROCESSED' and (ascension = %(asc)s or %(asc)s = '') and (character = %(character)s or %(character)s = '')
-        GROUP BY card_id, picked""",
-        {"asc": emptyStringIfNone(asc), "character": emptyStringIfNone(character)},
+        GROUP BY card_id_calc, picked""",
+        {
+            "asc": emptyStringIfNone(asc),
+            "character": emptyStringIfNone(character),
+            "upgradedCardsGrouped": upgradedCardsGrouped,
+        },
     )
     rows = cur.fetchall()
     results = {}
@@ -602,15 +606,20 @@ def getCardChoices(asc, character):
     return results
 
 
-def getIsSpecificCardInDeckAndWinRatio(asc, character):
+def getIsSpecificCardInDeckAndWinRatio(asc, character, upgradedCardsGrouped):
     cur.execute(
-        """SELECT card_id, victory, count(distinct(run_file_path)) 
+        """SELECT CASE WHEN %(upgradedCardsGrouped)s = false THEN card_id ELSE regexp_replace(card_id, '\+.*', '') END card_id_calc,
+         victory, count(distinct(run_file_path)) 
         FROM master_deck md 
         LEFT JOIN run r
         ON (md.run_file_path = r.file_path)
         WHERE status = 'PROCESSED' and (ascension = %(asc)s or %(asc)s = '') and (character = %(character)s or %(character)s = '')
-        GROUP BY card_id, victory""",
-        {"asc": emptyStringIfNone(asc), "character": emptyStringIfNone(character)},
+        GROUP BY card_id_calc, victory""",
+        {
+            "asc": emptyStringIfNone(asc),
+            "character": emptyStringIfNone(character),
+            "upgradedCardsGrouped": upgradedCardsGrouped,
+        },
     )
     rows = cur.fetchall()
     results = {}
@@ -626,20 +635,24 @@ def getIsSpecificCardInDeckAndWinRatio(asc, character):
     return results
 
 
-def getNumberOfSpecificCardsAndWinRatio(asc, character):
+def getNumberOfSpecificCardsAndWinRatio(asc, character, upgradedCardsGrouped):
     cur.execute(
-        """SELECT card_id, number, victory, count(*)
+        """SELECT card_id_calc, number, victory, count(*)
         FROM 
         (
-            SELECT card_id, victory, count(*) as number
+            SELECT CASE WHEN %(upgradedCardsGrouped)s = false THEN card_id ELSE regexp_replace(card_id, '\+.*', '') END card_id_calc, victory, count(*) as number
             FROM master_deck md 
             LEFT JOIN run r
             ON (md.run_file_path = r.file_path)
             WHERE status = 'PROCESSED' and (ascension = %(asc)s or %(asc)s = '') and (character = %(character)s or %(character)s = '')
-            GROUP BY card_id, file_path, victory
+            GROUP BY card_id_calc, file_path, victory
         ) AS amd
-        GROUP BY card_id, number, victory""",
-        {"asc": emptyStringIfNone(asc), "character": emptyStringIfNone(character)},
+        GROUP BY card_id_calc, number, victory""",
+        {
+            "asc": emptyStringIfNone(asc),
+            "character": emptyStringIfNone(character),
+            "upgradedCardsGrouped": upgradedCardsGrouped,
+        },
     )
     rows = cur.fetchall()
     results = {}
@@ -1154,236 +1167,132 @@ try:
                             printWinRatio(won, lost)
                         print()
 
-    printWinRatioSortedBy("02_win_ratio_sorted_alphabetically", lambda e: e[0])
-    printWinRatioSortedBy(
-        "03_win_ratio_sorted_by_most_played",
-        lambda e: -(winRatio[e]["won"] + winRatio[e]["lost"]),
+    def printCardChoicesForRuns(fileName, upgradedCardsGrouped, runsString):
+        # It doesn't really make sense to show it without specifying a character
+        with open(
+            "report/" + fileName + "_by_characters.txt", "w"
+        ) as f, redirect_stdout(f):
+            print("P = Picked")
+            print("NP = Not Picked")
+            print("R = Ratio")
+            print()
+            for character in sorted(characterKeys):
+                print(runsString + " on character " + character + " on all ascensions:")
+                printCardChoices(getCardChoices(None, character, upgradedCardsGrouped))
+                for ascInt in onlyTheHighestAscension:
+                    asc = str(ascInt)
+                    print(
+                        runsString
+                        + " on character "
+                        + character
+                        + " on ascension "
+                        + str(asc)
+                        + ":"
+                    )
+                    printCardChoices(
+                        getCardChoices(asc, character, upgradedCardsGrouped)
+                    )
+
+    printCardChoicesForRuns("09_card_choices", False, "Card choices")
+    printCardChoicesForRuns(
+        "10_card_choiced_upgraded_cards_grouped",
+        True,
+        "Card choices (upgraded cards grouped)",
     )
-    printWinRatioSortedBy(
-        "04_win_ratio_sorted_by_value",
-        lambda e: -winRatio[e]["won"] / (winRatio[e]["won"] + winRatio[e]["lost"]),
-    )
 
-    def printAverageLengthForRuns(fileName, isVictory, runsString):
-        with open("report/" + fileName + ".txt", "w") as f, redirect_stdout(f):
-            print(
-                "Average length of " + runsString + " runs on all ascensions:",
-                end=" ",
-            )
-            printAverageLength(getAverageLength(None, None, isVictory))
-            print()
-            for ascInt in sorted(ascKeysInts):
-                asc = str(ascInt)
-                length = getAverageLength(asc, None, isVictory)
-                if length["count"] <= CHARACTER_GAMES_THRESHOLD:
-                    continue
+    def printIsSpecificCardInDeckAndWinRatioForRuns(
+        fileName, upgradedCardsGrouped, runsString
+    ):
+        # It doesn't really make sense to show it without specifying a character
+        with open(
+            "report/" + fileName + ".txt",
+            "w",
+        ) as f, redirect_stdout(f):
+            for character in sorted(characterKeys):
                 print(
-                    "Average length of "
-                    + runsString
-                    + " runs on ascension "
-                    + str(asc)
-                    + ":",
-                    end=" ",
-                )
-                printAverageLength(length)
-            print()
-            if len(characterKeys) > 1:
-                with open(
-                    "report/" + fileName + "_by_characters.txt", "w"
-                ) as f, redirect_stdout(f):
-                    lengthDict = {}
-                    for character in characterKeys:
-                        lengthDict[character] = getAverageLength(
-                            None, character, isVictory
-                        )
-                    for character in sorted(
-                        characterKeys,
-                        key=lambda e: -lengthDict[e]["sum"] / lengthDict[e]["count"]
-                        if lengthDict[e]["count"] != 0
-                        else 0,
-                    ):
-                        length = lengthDict[character]
-                        if length["count"] <= CHARACTER_GAMES_THRESHOLD:
-                            continue
-                        print(
-                            "Average length of "
-                            + runsString
-                            + " runs on character "
-                            + character
-                            + " on all ascensions:",
-                            end=" ",
-                        )
-                        printAverageLength(length)
-                        print()
-                        for ascInt in sorted(ascKeysInts):
-                            asc = str(ascInt)
-                            length = getAverageLength(asc, character, isVictory)
-                            if length["count"] == 0:
-                                continue
-                            print(
-                                "Average length of "
-                                + runsString
-                                + " runs on character "
-                                + character
-                                + " on ascension "
-                                + str(asc)
-                                + ":",
-                                end=" ",
-                            )
-                            printAverageLength(length)
-                        print()
-            f.close()
-
-    printAverageLengthForRuns("05_average_length_won", True, "won")
-    printAverageLengthForRuns("06_average_length_lost", False, "lost")
-
-    def printMedianLengthForRuns(fileName, isVictory, runsString):
-        with open("report/" + fileName + ".txt", "w") as f, redirect_stdout(f):
-            print(
-                "Median length of " + runsString + " runs on all ascensions:",
-                end=" ",
-            )
-            median = getMedianLength(None, None, isVictory)
-            printMedianLength(median)
-            print()
-            for ascInt in sorted(ascKeysInts):
-                asc = str(ascInt)
-                median = getMedianLength(asc, None, isVictory)
-                if median["count"] <= CHARACTER_GAMES_THRESHOLD:
-                    continue
-                print(
-                    "Median length of "
-                    + runsString
-                    + " runs on ascension "
-                    + str(asc)
-                    + ":",
-                    end=" ",
-                )
-                printMedianLength(median)
-            print()
-            if len(characterKeys) > 1:
-                with open(
-                    "report/" + fileName + "_by_characters.txt", "w"
-                ) as f, redirect_stdout(f):
-                    medianDict = {}
-                    for character in characterKeys:
-                        medianDict[character] = getMedianLength(
-                            None, character, isVictory
-                        )
-                    for character in sorted(
-                        characterKeys,
-                        key=lambda e: -medianDict[e]["median"]
-                        if medianDict[e]["count"] != 0
-                        else 0,
-                    ):
-                        median = medianDict[character]
-                        if median["count"] <= CHARACTER_GAMES_THRESHOLD:
-                            continue
-                        print(
-                            "Median length of "
-                            + runsString
-                            + " runs on character "
-                            + character
-                            + " on all ascensions:",
-                            end=" ",
-                        )
-                        printMedianLength(median)
-                        print()
-                        for ascInt in sorted(ascKeysInts):
-                            asc = str(ascInt)
-                            median = getMedianLength(asc, character, isVictory)
-                            if median["count"] == 0:
-                                continue
-                            print(
-                                "Median length of "
-                                + runsString
-                                + " runs on character "
-                                + character
-                                + " on ascension "
-                                + str(asc)
-                                + ":",
-                                end=" ",
-                            )
-                            printMedianLength(median)
-                        print()
-            f.close()
-
-    printMedianLengthForRuns("07_median_length_won", True, "won")
-    printMedianLengthForRuns("08_median_length_lost", False, "lost")
-
-    # It doesn't really make sense to show it without specifying a character
-    with open("report/09_card_choices_by_characters.txt", "w") as f, redirect_stdout(f):
-        print("P = Picked")
-        print("NP = Not Picked")
-        print("R = Ratio")
-        print()
-        for character in sorted(characterKeys):
-            print("Card choices on character " + character + " on all ascensions:")
-            printCardChoices(getCardChoices(None, character))
-            for ascInt in onlyTheHighestAscension:
-                asc = str(ascInt)
-                print(
-                    "Card choices on character "
+                    runsString
+                    + " and win ratio on character "
                     + character
-                    + " on ascension "
-                    + str(asc)
-                    + ":"
-                )
-                printCardChoices(getCardChoices(asc, character))
-
-    # It doesn't really make sense to show it without specifying a character
-    with open(
-        "report/10_is_a_specific_card_in_deck_and_win_ratio_by_characters.txt",
-        "w",
-    ) as f, redirect_stdout(f):
-        for character in sorted(characterKeys):
-            print(
-                "Is a specific card in deck and win ratio and win ratio on character "
-                + character
-                + " on all ascensions:"
-            )
-            printIsSpecificCardInDeckAndWinRatio(
-                getIsSpecificCardInDeckAndWinRatio(None, character)
-            )
-            for ascInt in onlyTheHighestAscension:
-                asc = str(ascInt)
-                print(
-                    "Is a specific card in deck and win ratio and win ratio on character "
-                    + character
-                    + " on ascension "
-                    + str(asc)
-                    + ":"
+                    + " on all ascensions:"
                 )
                 printIsSpecificCardInDeckAndWinRatio(
-                    getIsSpecificCardInDeckAndWinRatio(asc, character)
+                    getIsSpecificCardInDeckAndWinRatio(
+                        None, character, upgradedCardsGrouped
+                    )
                 )
+                for ascInt in onlyTheHighestAscension:
+                    asc = str(ascInt)
+                    print(
+                        runsString
+                        + " and win ratio on character "
+                        + character
+                        + " on ascension "
+                        + str(asc)
+                        + ":"
+                    )
+                    printIsSpecificCardInDeckAndWinRatio(
+                        getIsSpecificCardInDeckAndWinRatio(
+                            asc, character, upgradedCardsGrouped
+                        )
+                    )
 
-    # It doesn't really make sense to show it without specifying a character
-    with open(
-        "report/11_number_of_specific_cards_and_win_ratio_by_characters.txt",
-        "w",
-    ) as f, redirect_stdout(f):
-        for character in sorted(characterKeys):
-            print(
-                "Number of specific cards and win ratio on character "
-                + character
-                + " on all ascensions:"
-            )
-            printNumberOfSpecificCardsAndWinRatio(
-                getNumberOfSpecificCardsAndWinRatio(None, character)
-            )
-            for ascInt in onlyTheHighestAscension:
-                asc = str(ascInt)
+    printIsSpecificCardInDeckAndWinRatioForRuns(
+        "11_is_a_specific_card_in_deck_and_win_ratio_by_characters",
+        False,
+        "Is a specific card in deck",
+    )
+    printIsSpecificCardInDeckAndWinRatioForRuns(
+        "12_is_a_specific_card_in_deck_upgraded_cards_grouped_and_win_ratio_by_characters",
+        True,
+        "Is a specific card in deck (upgraded cards grouped)",
+    )
+
+    def printNumberOfSpecificCardsAndWinRatioForRuns(
+        fileName, upgradedCardsGrouped, runsString
+    ):
+        # It doesn't really make sense to show it without specifying a character
+        with open(
+            "report/" + fileName + ".txt",
+            "w",
+        ) as f, redirect_stdout(f):
+            for character in sorted(characterKeys):
                 print(
-                    "Number of specific cards and win ratio on character "
+                    runsString
+                    + " and win ratio on character "
                     + character
-                    + " on ascension "
-                    + str(asc)
-                    + ":"
+                    + " on all ascensions:"
                 )
                 printNumberOfSpecificCardsAndWinRatio(
-                    getNumberOfSpecificCardsAndWinRatio(asc, character)
+                    getNumberOfSpecificCardsAndWinRatio(
+                        None, character, upgradedCardsGrouped
+                    )
                 )
+                for ascInt in onlyTheHighestAscension:
+                    asc = str(ascInt)
+                    print(
+                        runsString
+                        + " and win ratio on character "
+                        + character
+                        + " on ascension "
+                        + str(asc)
+                        + ":"
+                    )
+                    printNumberOfSpecificCardsAndWinRatio(
+                        getNumberOfSpecificCardsAndWinRatio(
+                            asc, character, upgradedCardsGrouped
+                        )
+                    )
+
+    printNumberOfSpecificCardsAndWinRatioForRuns(
+        "13_number_of_specific_cards_and_win_ratio_by_characters",
+        False,
+        "Number of specific cards",
+    )
+    printNumberOfSpecificCardsAndWinRatioForRuns(
+        "14_number_of_specific_cards_upgraded_cards_grouped_and_win_ratio_by_characters",
+        True,
+        "Number of specific cards (upgraded cards grouped)",
+    )
 
     def printHasSpecificRelicAndWinRatioForRuns(fileName, sortByPrefix):
         with open("report/" + fileName + ".txt", "w") as f, redirect_stdout(f):
@@ -1446,13 +1355,13 @@ try:
                             )
 
     printHasSpecificRelicAndWinRatioForRuns(
-        "12_has_a_specific_relic_and_win_ratio", False
+        "15_has_a_specific_relic_and_win_ratio", False
     )
     printHasSpecificRelicAndWinRatioForRuns(
-        "13_has_a_specific_relic_and_win_ratio_sorted_by_prefix", True
+        "16_has_a_specific_relic_and_win_ratio_sorted_by_prefix", True
     )
 
-    with open("report/14_average_damage_taken.txt", "w") as f, redirect_stdout(f):
+    with open("report/17_average_damage_taken.txt", "w") as f, redirect_stdout(f):
         print("Average damage taken on all ascensions:")
         printAverageDamageTaken(getAverageDamageTaken(None, None))
         for ascInt in onlyTheHighestAscension:
@@ -1461,7 +1370,7 @@ try:
             printAverageDamageTaken(getAverageDamageTaken(asc, None))
         if len(characterKeys) > 1:
             with open(
-                "report/14_average_damage_taken_by_characters.txt", "w"
+                "report/17_average_damage_taken_by_characters.txt", "w"
             ) as f, redirect_stdout(f):
                 for character in sorted(characterKeys):
                     print(
@@ -1481,7 +1390,7 @@ try:
                         )
                         printAverageDamageTaken(getAverageDamageTaken(asc, character))
 
-    with open("report/15_average_combat_length.txt", "w") as f, redirect_stdout(f):
+    with open("report/18_average_combat_length.txt", "w") as f, redirect_stdout(f):
         print("Average combat length on all ascensions:")
         printAverageCombatLength(getAverageCombatLength(None, None))
         for ascInt in onlyTheHighestAscension:
@@ -1490,7 +1399,7 @@ try:
             printAverageCombatLength(getAverageCombatLength(asc, None))
         if len(characterKeys) > 1:
             with open(
-                "report/15_average_combat_length_by_characters.txt", "w"
+                "report/18_average_combat_length_by_characters.txt", "w"
             ) as f, redirect_stdout(f):
                 for character in sorted(characterKeys):
                     print(
@@ -1510,7 +1419,7 @@ try:
                         )
                         printAverageCombatLength(getAverageCombatLength(asc, character))
 
-    with open("report/16_killed_by.txt", "w") as f, redirect_stdout(f):
+    with open("report/19_killed_by.txt", "w") as f, redirect_stdout(f):
         print("Killed by on all ascensions:")
         printKilledBy(getKilledBy(None, None))
         for ascInt in onlyTheHighestAscension:
@@ -1519,7 +1428,7 @@ try:
             printKilledBy(getKilledBy(asc, None))
         if len(characterKeys) > 1:
             with open(
-                "report/16_killed_by_by_characters.txt", "w"
+                "report/19_killed_by_by_characters.txt", "w"
             ) as f, redirect_stdout(f):
                 for character in sorted(characterKeys):
                     print("Killed by on character " + character + " on all ascensions:")
@@ -1589,17 +1498,17 @@ try:
             f.close()
 
     printSwappedStarterRelicSortedBy(
-        "17_swapped_starter_relic_sorted_by_popularity",
+        "20_swapped_starter_relic_sorted_by_popularity",
         lambda e: -swappedDict[e]["swapped"] / swappedDict[e]["total"],
     )
     printSwappedStarterRelicSortedBy(
-        "18_swapped_starter_relic_sorted_by_difference",
+        "21_swapped_starter_relic_sorted_by_difference",
         lambda e: -swappedDict[e]["difference"]
         if swappedDict[e]["difference"] is not None
         else 0,
     )
 
-    with open("report/19_hosts.txt", "w") as f, redirect_stdout(f):
+    with open("report/22_hosts.txt", "w") as f, redirect_stdout(f):
         print("Hosts on all ascensions:")
         printHosts(getHosts(None, None))
         for ascInt in onlyTheHighestAscension:
@@ -1607,7 +1516,7 @@ try:
             print("Hosts on ascension " + str(asc) + ":")
             printHosts(getHosts(asc, None))
         if len(characterKeys) > 1:
-            with open("report/19_hosts_by_characters.txt", "w") as f, redirect_stdout(
+            with open("report/22_hosts_by_characters.txt", "w") as f, redirect_stdout(
                 f
             ):
                 for character in sorted(characterKeys):
@@ -1624,7 +1533,7 @@ try:
                         )
                         printHosts(getHosts(asc, character))
 
-    with open("report/20_language.txt", "w") as f, redirect_stdout(f):
+    with open("report/23_language.txt", "w") as f, redirect_stdout(f):
         print("Language on all ascensions:")
         printLanguage(getLanguage(None, None))
         for ascInt in onlyTheHighestAscension:
@@ -1633,7 +1542,7 @@ try:
             printLanguage(getLanguage(asc, None))
         if len(characterKeys) > 1:
             with open(
-                "report/20_language_by_characters.txt", "w"
+                "report/23_language_by_characters.txt", "w"
             ) as f, redirect_stdout(f):
                 for character in sorted(characterKeys):
                     print("Language on character " + character + " on all ascensions:")
@@ -1649,7 +1558,7 @@ try:
                         )
                         printLanguage(getLanguage(asc, character))
 
-    with open("report/21_acts_visited.txt", "w") as f, redirect_stdout(f):
+    with open("report/24_acts_visited.txt", "w") as f, redirect_stdout(f):
         print("Acts visited on all ascensions:")
         printActsVisited(getActsVisited(None, None))
         for ascInt in onlyTheHighestAscension:
@@ -1658,7 +1567,7 @@ try:
             printActsVisited(getActsVisited(asc, None))
         if len(characterKeys) > 1:
             with open(
-                "report/21_acts_visited_by_characters.txt", "w"
+                "report/24_acts_visited_by_characters.txt", "w"
             ) as f, redirect_stdout(f):
                 for character in sorted(characterKeys):
                     print(
@@ -1677,7 +1586,7 @@ try:
                         printActsVisited(getActsVisited(asc, character))
 
     with open(
-        "report/22_enabled_mods.txt", "w", encoding="utf-8"
+        "report/25_enabled_mods.txt", "w", encoding="utf-8"
     ) as f, redirect_stdout(f):
         print("Enabled mods on all ascensions:")
         printEnabledMods(getEnabledMods(None, None))
@@ -1687,7 +1596,7 @@ try:
             printEnabledMods(getEnabledMods(asc, None))
         if len(characterKeys) > 1:
             with open(
-                "report/22_enabled_mods_by_characters.txt", "w", encoding="utf-8"
+                "report/25_enabled_mods_by_characters.txt", "w", encoding="utf-8"
             ) as f, redirect_stdout(f):
                 for character in sorted(characterKeys):
                     print(
