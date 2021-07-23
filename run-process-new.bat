@@ -1,0 +1,1 @@
+python .\metrics-sql.py --FIND_NEW_RUNS_TO_PROCESS=True --PROCESS_RUNS=True
