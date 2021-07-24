@@ -1,1 +1,1 @@
-python .\metrics-sql.py
+python .\metrics-sql.py --METRICS_PATH=D:\metrics_runs\minty_runs

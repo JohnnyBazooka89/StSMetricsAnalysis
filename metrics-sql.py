@@ -9,11 +9,8 @@ import argparse
 
 import psycopg2
 
-METRICS_PATH = "D:\\metrics_runs\\minty_runs"
-CHARACTER_CARD_PREFIX = ""
-RELIC_PREFIX = ""
-
 parser = argparse.ArgumentParser()
+parser.add_argument("--METRICS_PATH", type=str, required=True)
 parser.add_argument("--FIND_NEW_RUNS_TO_PROCESS", type=bool, required=False, default=False)
 parser.add_argument("--PROCESS_RUNS", type=bool, required=False, default=False)
 parser.add_argument("--AVERAGE_DAMAGE_TAKEN_COUNT_THRESHOLD", type=int, required=False, default=5)
@@ -22,11 +19,14 @@ parser.add_argument("--CHARACTER_GAMES_THRESHOLD", type=int, required=False, def
 parser.add_argument("--WIN_RATIO_CARDS_THRESHOLD", type=int, required=False, default=5)
 parser.add_argument("--WIN_RATIO_RELICS_THRESHOLD", type=int, required=False, default=5)
 parser.add_argument("--HOSTS_THRESHOLD", type=int, required=False, default=0)
+parser.add_argument("--CHARACTER_CARD_PREFIX", type=str, required=False, default="")
+parser.add_argument("--RELIC_PREFIX", type=str, required=False, default="")
 
 args = parser.parse_args()
 
 print("Run with params: " + str(args))
 
+METRICS_PATH = args.METRICS_PATH
 FIND_NEW_RUNS_TO_PROCESS = args.FIND_NEW_RUNS_TO_PROCESS
 PROCESS_RUNS = args.PROCESS_RUNS
 AVERAGE_DAMAGE_TAKEN_COUNT_THRESHOLD = args.AVERAGE_DAMAGE_TAKEN_COUNT_THRESHOLD
@@ -35,6 +35,8 @@ CHARACTER_GAMES_THRESHOLD = args.CHARACTER_GAMES_THRESHOLD
 WIN_RATIO_CARDS_THRESHOLD = args.WIN_RATIO_CARDS_THRESHOLD
 WIN_RATIO_RELICS_THRESHOLD = args.WIN_RATIO_RELICS_THRESHOLD
 HOSTS_THRESHOLD = args.HOSTS_THRESHOLD
+CHARACTER_CARD_PREFIX = args.CHARACTER_CARD_PREFIX
+RELIC_PREFIX = args.RELIC_PREFIX
 
 BASE_GAME_STARTER_RELICS = [
     "Burning Blood",
@@ -247,6 +249,10 @@ def getNewEmptyPickedNotPickedDict():
     return {"picked": 0, "not_picked": 0}
 
 
+def getNewAscRange(ascMin, ascMax):
+    return {"min": ascMin, "max": ascMax}
+
+
 def timeString(timeInSeconds):
     return time.strftime("%H:%M:%S", time.gmtime(timeInSeconds))
 
@@ -453,6 +459,14 @@ def emptyStringIfNone(string):
     return string if string else ""
 
 
+def minFromAscRange(ascRange):
+    return ascRange["min"] if ascRange else -20
+
+
+def maxFromAscRange(ascRange):
+    return ascRange["max"] if ascRange else 1000000000
+
+
 def getWinRatio(asc, character, victory):
     cur.execute(
         """SELECT count(*) FROM run 
@@ -520,17 +534,18 @@ def getAverageGoldGained(asc, character, victory):
     return {"sum": sum, "count": count}
 
 
-def getCardChoices(asc, character, upgradedCardsGrouped):
+def getCardChoices(ascRange, character, upgradedCardsGrouped):
     cur.execute(
         """SELECT CASE WHEN %(upgradedCardsGrouped)s = false THEN card_id ELSE regexp_replace(card_id, '\+.*', '') END card_id_calc,
         picked, count(*) 
         FROM card_choice c 
         LEFT JOIN run r
         ON (c.run_file_path = r.file_path)
-        WHERE status = 'PROCESSED' and (ascension = %(asc)s or %(asc)s = '') and (character = %(character)s or %(character)s = '')
+        WHERE status = 'PROCESSED' and (ascension::int >= %(ascMin)s and ascension::int <= %(ascMax)s) and (character = %(character)s or %(character)s = '')
         GROUP BY card_id_calc, picked""",
         {
-            "asc": emptyStringIfNone(asc),
+            "ascMin": minFromAscRange(ascRange),
+            "ascMax": maxFromAscRange(ascRange),
             "character": emptyStringIfNone(character),
             "upgradedCardsGrouped": upgradedCardsGrouped,
         },
@@ -540,7 +555,7 @@ def getCardChoices(asc, character, upgradedCardsGrouped):
     for row in rows:
         cardId = row[0]
         picked = row[1]
-        if not cardId in results:
+        if cardId not in results:
             results[cardId] = getNewEmptyPickedNotPickedDict()
         if picked:
             results[cardId]["picked"] = row[2]
@@ -549,17 +564,18 @@ def getCardChoices(asc, character, upgradedCardsGrouped):
     return results
 
 
-def getIsSpecificCardInDeckAndWinRatio(asc, character, upgradedCardsGrouped):
+def getIsSpecificCardInDeckAndWinRatio(ascRange, character, upgradedCardsGrouped):
     cur.execute(
         """SELECT CASE WHEN %(upgradedCardsGrouped)s = false THEN card_id ELSE regexp_replace(card_id, '\+.*', '') END card_id_calc,
          victory, count(distinct(run_file_path)) 
         FROM master_deck md 
         LEFT JOIN run r
         ON (md.run_file_path = r.file_path)
-        WHERE status = 'PROCESSED' and (ascension = %(asc)s or %(asc)s = '') and (character = %(character)s or %(character)s = '')
+        WHERE status = 'PROCESSED' and (ascension::int >= %(ascMin)s and ascension::int <= %(ascMax)s) and (character = %(character)s or %(character)s = '')
         GROUP BY card_id_calc, victory""",
         {
-            "asc": emptyStringIfNone(asc),
+            "ascMin": minFromAscRange(ascRange),
+            "ascMax": maxFromAscRange(ascRange),
             "character": emptyStringIfNone(character),
             "upgradedCardsGrouped": upgradedCardsGrouped,
         },
@@ -569,7 +585,7 @@ def getIsSpecificCardInDeckAndWinRatio(asc, character, upgradedCardsGrouped):
     for row in rows:
         cardId = row[0]
         victory = row[1]
-        if not cardId in results:
+        if cardId not in results:
             results[cardId] = getNewEmptyWonAndLostDict()
         if victory:
             results[cardId]["won"] = row[2]
@@ -578,7 +594,7 @@ def getIsSpecificCardInDeckAndWinRatio(asc, character, upgradedCardsGrouped):
     return results
 
 
-def getNumberOfSpecificCardsAndWinRatio(asc, character, upgradedCardsGrouped):
+def getNumberOfSpecificCardsAndWinRatio(ascRange, character, upgradedCardsGrouped):
     cur.execute(
         """SELECT card_id_calc, number, victory, count(*)
         FROM 
@@ -587,12 +603,13 @@ def getNumberOfSpecificCardsAndWinRatio(asc, character, upgradedCardsGrouped):
             FROM master_deck md 
             LEFT JOIN run r
             ON (md.run_file_path = r.file_path)
-            WHERE status = 'PROCESSED' and (ascension = %(asc)s or %(asc)s = '') and (character = %(character)s or %(character)s = '')
+            WHERE status = 'PROCESSED' and (ascension::int >= %(ascMin)s and ascension::int <= %(ascMax)s) and (character = %(character)s or %(character)s = '')
             GROUP BY card_id_calc, file_path, victory
         ) AS amd
         GROUP BY card_id_calc, number, victory""",
         {
-            "asc": emptyStringIfNone(asc),
+            "ascMin": minFromAscRange(ascRange),
+            "ascMax": maxFromAscRange(ascRange),
             "character": emptyStringIfNone(character),
             "upgradedCardsGrouped": upgradedCardsGrouped,
         },
@@ -603,9 +620,9 @@ def getNumberOfSpecificCardsAndWinRatio(asc, character, upgradedCardsGrouped):
         cardId = row[0]
         number = row[1]
         victory = row[2]
-        if not cardId in results:
+        if cardId not in results:
             results[cardId] = {}
-        if not number in results[cardId]:
+        if number not in results[cardId]:
             results[cardId][number] = getNewEmptyWonAndLostDict()
         if victory:
             results[cardId][number]["won"] = row[3]
@@ -614,22 +631,22 @@ def getNumberOfSpecificCardsAndWinRatio(asc, character, upgradedCardsGrouped):
     return results
 
 
-def getHasSpecificRelicAndWinRatio(asc, character):
+def getHasSpecificRelicAndWinRatio(ascRange, character):
     cur.execute(
         """SELECT relic_id, victory, count(distinct(run_file_path)) 
         FROM relic re 
         LEFT JOIN run r
         ON (re.run_file_path = r.file_path)
-        WHERE status = 'PROCESSED' and (ascension = %(asc)s or %(asc)s = '') and (character = %(character)s or %(character)s = '')
+        WHERE status = 'PROCESSED' and (ascension::int >= %(ascMin)s and ascension::int <= %(ascMax)s) and (character = %(character)s or %(character)s = '')
         GROUP BY relic_id, victory""",
-        {"asc": emptyStringIfNone(asc), "character": emptyStringIfNone(character)},
+        {"ascMin": minFromAscRange(ascRange), "ascMax": maxFromAscRange(ascRange), "character": emptyStringIfNone(character)},
     )
     rows = cur.fetchall()
     results = {}
     for row in rows:
         cardId = row[0]
         victory = row[1]
-        if not cardId in results:
+        if cardId not in results:
             results[cardId] = getNewEmptyWonAndLostDict()
         if victory:
             results[cardId]["won"] = row[2]
@@ -638,15 +655,15 @@ def getHasSpecificRelicAndWinRatio(asc, character):
     return results
 
 
-def getAverageDamageTaken(asc, character):
+def getAverageDamageTaken(ascRange, character):
     cur.execute(
         """SELECT enemies, sum(damage), count(*)
         FROM damage_taken dt
         LEFT JOIN run r
         ON (dt.run_file_path = r.file_path)
-        WHERE status = 'PROCESSED' and (ascension = %(asc)s or %(asc)s = '') and (character = %(character)s or %(character)s = '')
+        WHERE status = 'PROCESSED' and (ascension::int >= %(ascMin)s and ascension::int <= %(ascMax)s) and (character = %(character)s or %(character)s = '')
         GROUP BY enemies""",
-        {"asc": emptyStringIfNone(asc), "character": emptyStringIfNone(character)},
+        {"ascMin": minFromAscRange(ascRange), "ascMax": maxFromAscRange(ascRange), "character": emptyStringIfNone(character)},
     )
     rows = cur.fetchall()
     results = {}
@@ -655,15 +672,15 @@ def getAverageDamageTaken(asc, character):
     return results
 
 
-def getAverageCombatLength(asc, character):
+def getAverageCombatLength(ascRange, character):
     cur.execute(
         """SELECT enemies, sum(turns), count(*)
         FROM damage_taken dt
         LEFT JOIN run r
         ON (dt.run_file_path = r.file_path)
-        WHERE status = 'PROCESSED' and (ascension = %(asc)s or %(asc)s = '') and (character = %(character)s or %(character)s = '')
+        WHERE status = 'PROCESSED' and (ascension::int >= %(ascMin)s and ascension::int <= %(ascMax)s) and (character = %(character)s or %(character)s = '')
         GROUP BY enemies""",
-        {"asc": emptyStringIfNone(asc), "character": emptyStringIfNone(character)},
+        {"ascMin": minFromAscRange(ascRange), "ascMax": maxFromAscRange(ascRange), "character": emptyStringIfNone(character)},
     )
     rows = cur.fetchall()
     results = {}
@@ -672,15 +689,15 @@ def getAverageCombatLength(asc, character):
     return results
 
 
-def getKilledBy(asc, character):
+def getKilledBy(ascRange, character):
     cur.execute(
         """SELECT enemy_id, count(*)
         FROM killed_by kb
         LEFT JOIN run r
         ON (kb.run_file_path = r.file_path)
-        WHERE status = 'PROCESSED' and (ascension = %(asc)s or %(asc)s = '') and (character = %(character)s or %(character)s = '')
+        WHERE status = 'PROCESSED' and (ascension::int >= %(ascMin)s and ascension::int <= %(ascMax)s) and (character = %(character)s or %(character)s = '')
         GROUP BY enemy_id""",
-        {"asc": emptyStringIfNone(asc), "character": emptyStringIfNone(character)},
+        {"ascMin": minFromAscRange(ascRange), "ascMax": maxFromAscRange(ascRange), "character": emptyStringIfNone(character)},
     )
     rows = cur.fetchall()
     results = {}
@@ -720,13 +737,13 @@ def getSwappedStarterRelic(asc, character):
     }
 
 
-def getHosts(asc, character):
+def getHosts(ascRange, character):
     cur.execute(
         """SELECT host, count(*)
         FROM run r
-        WHERE status = 'PROCESSED' and (ascension = %(asc)s or %(asc)s = '') and (character = %(character)s or %(character)s = '')
+        WHERE status = 'PROCESSED' and (ascension::int >= %(ascMin)s and ascension::int <= %(ascMax)s) and (character = %(character)s or %(character)s = '')
         GROUP BY host""",
-        {"asc": emptyStringIfNone(asc), "character": emptyStringIfNone(character)},
+        {"ascMin": minFromAscRange(ascRange), "ascMax": maxFromAscRange(ascRange), "character": emptyStringIfNone(character)},
     )
     rows = cur.fetchall()
     results = {}
@@ -735,13 +752,13 @@ def getHosts(asc, character):
     return results
 
 
-def getLanguage(asc, character):
+def getLanguage(ascRange, character):
     cur.execute(
         """SELECT language, count(*)
         FROM run r
-        WHERE status = 'PROCESSED' and (ascension = %(asc)s or %(asc)s = '') and (character = %(character)s or %(character)s = '')
+        WHERE status = 'PROCESSED' and (ascension::int >= %(ascMin)s and ascension::int <= %(ascMax)s) and (character = %(character)s or %(character)s = '')
         GROUP BY language""",
-        {"asc": emptyStringIfNone(asc), "character": emptyStringIfNone(character)},
+        {"ascMin": minFromAscRange(ascRange), "ascMax": maxFromAscRange(ascRange), "character": emptyStringIfNone(character)},
     )
     rows = cur.fetchall()
     results = {}
@@ -750,14 +767,14 @@ def getLanguage(asc, character):
     return results
 
 
-def getActsVisited(asc, character):
+def getActsVisited(ascRange, character):
     cur.execute(
         """SELECT act_name, count(*) as c 
         FROM act_visited av 
         LEFT JOIN run r ON av.run_file_path = r.file_path
-        WHERE status = 'PROCESSED' and (ascension = %(asc)s or %(asc)s = '') and (character = %(character)s or %(character)s = '')
+        WHERE status = 'PROCESSED' and (ascension::int >= %(ascMin)s and ascension::int <= %(ascMax)s) and (character = %(character)s or %(character)s = '')
         GROUP BY act_name""",
-        {"asc": emptyStringIfNone(asc), "character": emptyStringIfNone(character)},
+        {"ascMin": minFromAscRange(ascRange), "ascMax": maxFromAscRange(ascRange), "character": emptyStringIfNone(character)},
     )
     rows = cur.fetchall()
     results = {}
@@ -766,14 +783,14 @@ def getActsVisited(asc, character):
     return results
 
 
-def getEnabledMods(asc, character):
+def getEnabledMods(ascRange, character):
     cur.execute(
         """SELECT mod_name, count(*) as c 
         FROM mod m 
         LEFT JOIN run r ON m.run_file_path = r.file_path
-        WHERE status = 'PROCESSED' and (ascension = %(asc)s or %(asc)s = '') and (character = %(character)s or %(character)s = '')
+        WHERE status = 'PROCESSED' and (ascension::int >= %(ascMin)s and ascension::int <= %(ascMax)s) and (character = %(character)s or %(character)s = '')
         GROUP BY mod_name""",
-        {"asc": emptyStringIfNone(asc), "character": emptyStringIfNone(character)},
+        {"ascMin": minFromAscRange(ascRange), "ascMax": maxFromAscRange(ascRange), "character": emptyStringIfNone(character)},
     )
     rows = cur.fetchall()
     results = {}
@@ -898,7 +915,7 @@ try:
                 for damageTakenEntry in runJson["event"]["damage_taken"]:
                     if damageTakenEntry["damage"] >= 99999:
                         continue
-                    if not "enemies" in damageTakenEntry:
+                    if "enemies" not in damageTakenEntry:
                         continue
                     enemies = damageTakenEntry["enemies"]
                     damage = damageTakenEntry["damage"]
@@ -1005,7 +1022,12 @@ try:
 
     ascKeysInts = set()
     characterKeys = set()
-    onlyTheHighestAscension = (20,)
+    ascRanges = (getNewAscRange(0, 1), getNewAscRange(2, 19), getNewAscRange(20, 20))
+
+    def stringFromAscRange(ascRange):
+        if ascRange["min"] == ascRange["max"]:
+            return str(ascRange["min"])
+        return str(ascRange["min"]) + "-" + str(ascRange["max"])
 
     cur.execute("SELECT ascension FROM run WHERE status = 'PROCESSED'")
     rows = cur.fetchall()
@@ -1206,10 +1228,9 @@ try:
             for character in sorted(characterKeys):
                 print(runsString + " on character " + character + " on all ascensions:")
                 printCardChoices(getCardChoices(None, character, upgradedCardsGrouped))
-                for ascInt in onlyTheHighestAscension:
-                    asc = str(ascInt)
-                    print(runsString + " on character " + character + " on ascension " + str(asc) + ":")
-                    printCardChoices(getCardChoices(asc, character, upgradedCardsGrouped))
+                for ascRange in ascRanges:
+                    print(runsString + " on character " + character + " on ascensions " + stringFromAscRange(ascRange) + ":")
+                    printCardChoices(getCardChoices(ascRange, character, upgradedCardsGrouped))
 
     printCardChoicesForRuns("09_card_choices", False, "Card choices")
     printCardChoicesForRuns(
@@ -1227,10 +1248,9 @@ try:
             for character in sorted(characterKeys):
                 print(runsString + " and win ratio on character " + character + " on all ascensions:")
                 printIsSpecificCardInDeckAndWinRatio(getIsSpecificCardInDeckAndWinRatio(None, character, upgradedCardsGrouped))
-                for ascInt in onlyTheHighestAscension:
-                    asc = str(ascInt)
-                    print(runsString + " and win ratio on character " + character + " on ascension " + str(asc) + ":")
-                    printIsSpecificCardInDeckAndWinRatio(getIsSpecificCardInDeckAndWinRatio(asc, character, upgradedCardsGrouped))
+                for ascRange in ascRanges:
+                    print(runsString + " and win ratio on character " + character + " on ascensions " + stringFromAscRange(ascRange) + ":")
+                    printIsSpecificCardInDeckAndWinRatio(getIsSpecificCardInDeckAndWinRatio(ascRange, character, upgradedCardsGrouped))
 
     printIsSpecificCardInDeckAndWinRatioForRuns(
         "11_is_a_specific_card_in_deck_and_win_ratio_by_characters",
@@ -1252,10 +1272,9 @@ try:
             for character in sorted(characterKeys):
                 print(runsString + " and win ratio on character " + character + " on all ascensions:")
                 printNumberOfSpecificCardsAndWinRatio(getNumberOfSpecificCardsAndWinRatio(None, character, upgradedCardsGrouped))
-                for ascInt in onlyTheHighestAscension:
-                    asc = str(ascInt)
-                    print(runsString + " and win ratio on character " + character + " on ascension " + str(asc) + ":")
-                    printNumberOfSpecificCardsAndWinRatio(getNumberOfSpecificCardsAndWinRatio(asc, character, upgradedCardsGrouped))
+                for ascRange in ascRanges:
+                    print(runsString + " and win ratio on character " + character + " on ascensions " + stringFromAscRange(ascRange) + ":")
+                    printNumberOfSpecificCardsAndWinRatio(getNumberOfSpecificCardsAndWinRatio(ascRange, character, upgradedCardsGrouped))
 
     printNumberOfSpecificCardsAndWinRatioForRuns(
         "13_number_of_specific_cards_and_win_ratio_by_characters",
@@ -1272,16 +1291,14 @@ try:
         with open("report/" + fileName + ".txt", "w") as f, redirect_stdout(f):
             print("Has a specific relic and win ratio on all ascensions (only base game relics):")
             printHasSpecificRelicAndWinRatio(getHasSpecificRelicAndWinRatio(None, None), True, sortByPrefix)
-            for ascInt in onlyTheHighestAscension:
-                asc = str(ascInt)
-                print("Has a specific relic and win ratio on ascension " + str(asc) + " (only base game relics):")
-                printHasSpecificRelicAndWinRatio(getHasSpecificRelicAndWinRatio(asc, None), True, sortByPrefix)
+            for ascRange in ascRanges:
+                print("Has a specific relic and win ratio on ascensions " + stringFromAscRange(ascRange) + " (only base game relics):")
+                printHasSpecificRelicAndWinRatio(getHasSpecificRelicAndWinRatio(ascRange, None), True, sortByPrefix)
             print("Has a specific relic and win ratio on all ascensions:")
             printHasSpecificRelicAndWinRatio(getHasSpecificRelicAndWinRatio(None, None), False, sortByPrefix)
-            for ascInt in onlyTheHighestAscension:
-                asc = str(ascInt)
-                print("Has a specific relic and win ratio on ascension " + str(asc) + ":")
-                printHasSpecificRelicAndWinRatio(getHasSpecificRelicAndWinRatio(asc, None), False, sortByPrefix)
+            for ascRange in ascRanges:
+                print("Has a specific relic and win ratio on ascensions " + stringFromAscRange(ascRange) + ":")
+                printHasSpecificRelicAndWinRatio(getHasSpecificRelicAndWinRatio(ascRange, None), False, sortByPrefix)
             if len(characterKeys) > 1:
                 with open("report/" + fileName + "_by_characters.txt", "w") as f, redirect_stdout(f):
                     for character in sorted(characterKeys):
@@ -1291,11 +1308,16 @@ try:
                             False,
                             sortByPrefix,
                         )
-                        for ascInt in onlyTheHighestAscension:
-                            asc = str(ascInt)
-                            print("Has a specific relic and win ratio and win ratio on character " + character + " on ascension " + str(asc) + ":")
+                        for ascRange in ascRanges:
+                            print(
+                                "Has a specific relic and win ratio and win ratio on character "
+                                + character
+                                + " on ascensions "
+                                + stringFromAscRange(ascRange)
+                                + ":"
+                            )
                             printHasSpecificRelicAndWinRatio(
-                                getHasSpecificRelicAndWinRatio(asc, character),
+                                getHasSpecificRelicAndWinRatio(ascRange, character),
                                 False,
                                 sortByPrefix,
                             )
@@ -1306,53 +1328,47 @@ try:
     with open("report/17_average_damage_taken.txt", "w") as f, redirect_stdout(f):
         print("Average damage taken on all ascensions:")
         printAverageDamageTaken(getAverageDamageTaken(None, None))
-        for ascInt in onlyTheHighestAscension:
-            asc = str(ascInt)
-            print("Average damage taken on ascension " + str(asc) + ":")
-            printAverageDamageTaken(getAverageDamageTaken(asc, None))
+        for ascRange in ascRanges:
+            print("Average damage taken on ascensions " + stringFromAscRange(ascRange) + ":")
+            printAverageDamageTaken(getAverageDamageTaken(ascRange, None))
         if len(characterKeys) > 1:
             with open("report/17_average_damage_taken_by_characters.txt", "w") as f, redirect_stdout(f):
                 for character in sorted(characterKeys):
                     print("Average damage taken on character " + character + " on all ascensions:")
                     printAverageDamageTaken(getAverageDamageTaken(None, character))
-                    for ascInt in onlyTheHighestAscension:
-                        asc = str(ascInt)
-                        print("Average damage taken on character " + character + " on ascension " + str(asc) + ":")
-                        printAverageDamageTaken(getAverageDamageTaken(asc, character))
+                    for ascRange in ascRanges:
+                        print("Average damage taken on character " + character + " on ascensions " + stringFromAscRange(ascRange) + ":")
+                        printAverageDamageTaken(getAverageDamageTaken(ascRange, character))
 
     with open("report/18_average_combat_length.txt", "w") as f, redirect_stdout(f):
         print("Average combat length on all ascensions:")
         printAverageCombatLength(getAverageCombatLength(None, None))
-        for ascInt in onlyTheHighestAscension:
-            asc = str(ascInt)
-            print("Average combat length on ascension " + str(asc) + ":")
-            printAverageCombatLength(getAverageCombatLength(asc, None))
+        for ascRange in ascRanges:
+            print("Average combat length on ascensions " + stringFromAscRange(ascRange) + ":")
+            printAverageCombatLength(getAverageCombatLength(ascRange, None))
         if len(characterKeys) > 1:
             with open("report/18_average_combat_length_by_characters.txt", "w") as f, redirect_stdout(f):
                 for character in sorted(characterKeys):
                     print("Average combat length on character " + character + " on all ascensions:")
                     printAverageCombatLength(getAverageCombatLength(None, character))
-                    for ascInt in onlyTheHighestAscension:
-                        asc = str(ascInt)
-                        print("Average combat length on character " + character + " on ascension " + str(asc) + ":")
-                        printAverageCombatLength(getAverageCombatLength(asc, character))
+                    for ascRange in ascRanges:
+                        print("Average combat length on character " + character + " on ascensions " + stringFromAscRange(ascRange) + ":")
+                        printAverageCombatLength(getAverageCombatLength(ascRange, character))
 
     with open("report/19_killed_by.txt", "w") as f, redirect_stdout(f):
         print("Killed by on all ascensions:")
         printKilledBy(getKilledBy(None, None))
-        for ascInt in onlyTheHighestAscension:
-            asc = str(ascInt)
-            print("Killed by on ascension " + str(asc) + ":")
-            printKilledBy(getKilledBy(asc, None))
+        for ascRange in ascRanges:
+            print("Killed by on ascensions " + stringFromAscRange(ascRange) + ":")
+            printKilledBy(getKilledBy(ascRange, None))
         if len(characterKeys) > 1:
             with open("report/19_killed_by_by_characters.txt", "w") as f, redirect_stdout(f):
                 for character in sorted(characterKeys):
                     print("Killed by on character " + character + " on all ascensions:")
                     printKilledBy(getKilledBy(None, character))
-                    for ascInt in onlyTheHighestAscension:
-                        asc = str(ascInt)
-                        print("Killed by on character " + character + " on ascension " + str(asc) + ":")
-                        printKilledBy(getKilledBy(asc, character))
+                    for ascRange in ascRanges:
+                        print("Killed by on character " + character + " on ascensions " + stringFromAscRange(ascRange) + ":")
+                        printKilledBy(getKilledBy(ascRange, character))
 
     def printSwappedStarterRelicSortedBy(fileName, keyLambda):
         global swappedDict
@@ -1411,70 +1427,62 @@ try:
     with open("report/22_hosts.txt", "w") as f, redirect_stdout(f):
         print("Hosts on all ascensions:")
         printHosts(getHosts(None, None))
-        for ascInt in onlyTheHighestAscension:
-            asc = str(ascInt)
-            print("Hosts on ascension " + str(asc) + ":")
-            printHosts(getHosts(asc, None))
+        for ascRange in ascRanges:
+            print("Hosts on ascensions " + stringFromAscRange(ascRange) + ":")
+            printHosts(getHosts(ascRange, None))
         if len(characterKeys) > 1:
             with open("report/22_hosts_by_characters.txt", "w") as f, redirect_stdout(f):
                 for character in sorted(characterKeys):
                     print("Hosts on character " + character + " on all ascensions:")
                     printHosts(getHosts(None, character))
-                    for ascInt in onlyTheHighestAscension:
-                        asc = str(ascInt)
-                        print("Hosts on character " + character + " on ascension " + str(asc) + ":")
-                        printHosts(getHosts(asc, character))
+                    for ascRange in ascRanges:
+                        print("Hosts on character " + character + " on ascensions " + stringFromAscRange(ascRange) + ":")
+                        printHosts(getHosts(ascRange, character))
 
     with open("report/23_language.txt", "w") as f, redirect_stdout(f):
         print("Language on all ascensions:")
         printLanguage(getLanguage(None, None))
-        for ascInt in onlyTheHighestAscension:
-            asc = str(ascInt)
-            print("Language on ascension " + str(asc) + ":")
-            printLanguage(getLanguage(asc, None))
+        for ascRange in ascRanges:
+            print("Language on ascensions " + stringFromAscRange(ascRange) + ":")
+            printLanguage(getLanguage(ascRange, None))
         if len(characterKeys) > 1:
             with open("report/23_language_by_characters.txt", "w") as f, redirect_stdout(f):
                 for character in sorted(characterKeys):
                     print("Language on character " + character + " on all ascensions:")
                     printLanguage(getLanguage(None, character))
-                    for ascInt in onlyTheHighestAscension:
-                        asc = str(ascInt)
-                        print("Language on character " + character + " on ascension " + str(asc) + ":")
-                        printLanguage(getLanguage(asc, character))
+                    for ascRange in ascRanges:
+                        print("Language on character " + character + " on ascensions " + stringFromAscRange(ascRange) + ":")
+                        printLanguage(getLanguage(ascRange, character))
 
     with open("report/24_acts_visited.txt", "w") as f, redirect_stdout(f):
         print("Acts visited on all ascensions:")
         printActsVisited(getActsVisited(None, None))
-        for ascInt in onlyTheHighestAscension:
-            asc = str(ascInt)
-            print("Acts visited on ascension " + str(asc) + ":")
-            printActsVisited(getActsVisited(asc, None))
+        for ascRange in ascRanges:
+            print("Acts visited on ascensions " + stringFromAscRange(ascRange) + ":")
+            printActsVisited(getActsVisited(ascRange, None))
         if len(characterKeys) > 1:
             with open("report/24_acts_visited_by_characters.txt", "w") as f, redirect_stdout(f):
                 for character in sorted(characterKeys):
                     print("Acts visited on character " + character + " on all ascensions:")
                     printActsVisited(getActsVisited(None, character))
-                    for ascInt in onlyTheHighestAscension:
-                        asc = str(ascInt)
-                        print("Acts visited on character " + character + " on ascension " + str(asc) + ":")
-                        printActsVisited(getActsVisited(asc, character))
+                    for ascRange in ascRanges:
+                        print("Acts visited on character " + character + " on ascensions " + stringFromAscRange(ascRange) + ":")
+                        printActsVisited(getActsVisited(ascRange, character))
 
     with open("report/25_enabled_mods.txt", "w", encoding="utf-8") as f, redirect_stdout(f):
         print("Enabled mods on all ascensions:")
         printEnabledMods(getEnabledMods(None, None))
-        for ascInt in onlyTheHighestAscension:
-            asc = str(ascInt)
-            print("Enabled mods on ascension " + str(asc) + ":")
-            printEnabledMods(getEnabledMods(asc, None))
+        for ascRange in ascRanges:
+            print("Enabled mods on ascensions " + stringFromAscRange(ascRange) + ":")
+            printEnabledMods(getEnabledMods(ascRange, None))
         if len(characterKeys) > 1:
             with open("report/25_enabled_mods_by_characters.txt", "w", encoding="utf-8") as f, redirect_stdout(f):
                 for character in sorted(characterKeys):
                     print("Enabled mods on character " + character + " on all ascensions:")
                     printEnabledMods(getEnabledMods(None, character))
-                    for ascInt in onlyTheHighestAscension:
-                        asc = str(ascInt)
-                        print("Enabled mods on character " + character + " on ascension " + str(asc) + ":")
-                        printEnabledMods(getEnabledMods(asc, character))
+                    for ascRange in ascRanges:
+                        print("Enabled mods on character " + character + " on ascensions " + stringFromAscRange(ascRange) + ":")
+                        printEnabledMods(getEnabledMods(ascRange, character))
 
 
 except Exception as e:

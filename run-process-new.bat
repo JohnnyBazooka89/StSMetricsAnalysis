@@ -1,1 +1,1 @@
-python .\metrics-sql.py --FIND_NEW_RUNS_TO_PROCESS=True --PROCESS_RUNS=True
+python .\metrics-sql.py --METRICS_PATH=D:\metrics_runs\minty_runs --FIND_NEW_RUNS_TO_PROCESS=True --PROCESS_RUNS=True
