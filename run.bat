@@ -1,1 +1,1 @@
-python .\metrics-sql.py --METRICS_PATH=D:\metrics_runs\minty_runs
+python .\metrics-sql.py --METRICS_PATH=D:\metrics_runs\minty_runs --DATABASE=metrics --DATABASE_USER=postgres --DATABASE_PASSWORD=secret

@@ -1,1 +1,1 @@
-python .\metrics-sql.py --METRICS_PATH=D:\metrics_runs\minty_runs --FIND_NEW_RUNS_TO_PROCESS=True --PROCESS_RUNS=True
+python .\metrics-sql.py --METRICS_PATH=D:\metrics_runs\minty_runs  --DATABASE=metrics --DATABASE_USER=postgres --DATABASE_PASSWORD=secret --FIND_NEW_RUNS_TO_PROCESS=True --PROCESS_RUNS=True

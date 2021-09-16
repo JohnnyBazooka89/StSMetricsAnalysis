@@ -11,6 +11,9 @@ import psycopg2
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--METRICS_PATH", type=str, required=True)
+parser.add_argument("--DATABASE", type=str, required=True)
+parser.add_argument("--DATABASE_USER", type=str, required=True)
+parser.add_argument("--DATABASE_PASSWORD", type=str, required=True)
 parser.add_argument("--FIND_NEW_RUNS_TO_PROCESS", type=bool, required=False, default=False)
 parser.add_argument("--PROCESS_RUNS", type=bool, required=False, default=False)
 parser.add_argument("--AVERAGE_DAMAGE_TAKEN_COUNT_THRESHOLD", type=int, required=False, default=5)
@@ -27,6 +30,9 @@ args = parser.parse_args()
 print("Run with params: " + str(args))
 
 METRICS_PATH = args.METRICS_PATH
+DATABASE = args.DATABASE
+DATABASE_USER = args.DATABASE_USER
+DATABASE_PASSWORD = args.DATABASE_PASSWORD
 FIND_NEW_RUNS_TO_PROCESS = args.FIND_NEW_RUNS_TO_PROCESS
 PROCESS_RUNS = args.PROCESS_RUNS
 AVERAGE_DAMAGE_TAKEN_COUNT_THRESHOLD = args.AVERAGE_DAMAGE_TAKEN_COUNT_THRESHOLD
@@ -802,7 +808,7 @@ def getEnabledMods(ascRange, character):
 conn = None
 
 try:
-    conn = psycopg2.connect(database="metrics", user="postgres", password="secret")
+    conn = psycopg2.connect(database=DATABASE, user=DATABASE_USER, password=DATABASE_PASSWORD)
     cur = conn.cursor()
 
     if FIND_NEW_RUNS_TO_PROCESS:
