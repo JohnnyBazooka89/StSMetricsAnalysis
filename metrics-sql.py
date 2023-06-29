@@ -1060,15 +1060,16 @@ try:
     if not os.path.exists("report"):
         os.makedirs("report")
 
-    with open("report/01_summary.txt", "w") as f, redirect_stdout(f):
+    with open("report/01_summary.txt", "w", encoding="utf-8") as f, redirect_stdout(f):
         print(str(totalRuns) + " total runs")
         print(str(endlessRuns) + " endless runs were skipped")
         print(str(leftTooEarlyRuns) + " runs were skipped, because they were left too early")
         print(str(exceptionRuns) + " runs threw an exception")
+        print(str(totalRuns - endlessRuns - leftTooEarlyRuns - exceptionRuns) + " total runs processed")
 
     def printWinRatioSortedBy(fileName, keyLambda):
         global winRatio
-        with open("report/" + fileName + ".txt", "w") as f, redirect_stdout(f):
+        with open("report/" + fileName + ".txt", "w", encoding="utf-8") as f, redirect_stdout(f):
             print("Win ratio on all ascensions:", end=" ")
             printWinRatio(getWinRatio(None, None, True), getWinRatio(None, None, False))
             print()
@@ -1077,7 +1078,7 @@ try:
                 print("Win ratio on ascension " + asc + ":", end=" ")
                 printWinRatio(getWinRatio(asc, None, True), getWinRatio(asc, None, False))
             if len(characterKeys) > 1:
-                with open("report/" + fileName + "_by_characters.txt", "w") as f, redirect_stdout(f):
+                with open("report/" + fileName + "_by_characters.txt", "w", encoding="utf-8") as f, redirect_stdout(f):
                     winRatio = {}
                     for character in characterKeys:
                         won = getWinRatio(None, character, True)
@@ -1118,7 +1119,7 @@ try:
     )
 
     def printAverageLengthForRuns(fileName, isVictory, runsString):
-        with open("report/" + fileName + ".txt", "w") as f, redirect_stdout(f):
+        with open("report/" + fileName + ".txt", "w", encoding="utf-8") as f, redirect_stdout(f):
             print(
                 "Average length of " + runsString + " runs on all ascensions:",
                 end=" ",
@@ -1137,7 +1138,7 @@ try:
                 printAverageLength(length)
             print()
             if len(characterKeys) > 1:
-                with open("report/" + fileName + "_by_characters.txt", "w") as f, redirect_stdout(f):
+                with open("report/" + fileName + "_by_characters.txt", "w", encoding="utf-8") as f, redirect_stdout(f):
                     lengthDict = {}
                     for character in characterKeys:
                         lengthDict[character] = getAverageLength(None, character, isVictory)
@@ -1171,7 +1172,7 @@ try:
     printAverageLengthForRuns("06_average_length_lost", False, "lost")
 
     def printMedianLengthForRuns(fileName, isVictory, runsString):
-        with open("report/" + fileName + ".txt", "w") as f, redirect_stdout(f):
+        with open("report/" + fileName + ".txt", "w", encoding="utf-8") as f, redirect_stdout(f):
             print(
                 "Median length of " + runsString + " runs on all ascensions:",
                 end=" ",
@@ -1191,7 +1192,7 @@ try:
                 printMedianLength(median)
             print()
             if len(characterKeys) > 1:
-                with open("report/" + fileName + "_by_characters.txt", "w") as f, redirect_stdout(f):
+                with open("report/" + fileName + "_by_characters.txt", "w", encoding="utf-8") as f, redirect_stdout(f):
                     medianDict = {}
                     for character in characterKeys:
                         medianDict[character] = getMedianLength(None, character, isVictory)
@@ -1226,7 +1227,7 @@ try:
 
     def printCardChoicesForRuns(fileName, upgradedCardsGrouped, runsString):
         # It doesn't really make sense to show it without specifying a character
-        with open("report/" + fileName + "_by_characters.txt", "w") as f, redirect_stdout(f):
+        with open("report/" + fileName + "_by_characters.txt", "w", encoding="utf-8") as f, redirect_stdout(f):
             print("P = Picked")
             print("NP = Not Picked")
             print("R = Ratio")
@@ -1294,7 +1295,7 @@ try:
     )
 
     def printHasSpecificRelicAndWinRatioForRuns(fileName, sortByPrefix):
-        with open("report/" + fileName + ".txt", "w") as f, redirect_stdout(f):
+        with open("report/" + fileName + ".txt", "w", encoding="utf-8") as f, redirect_stdout(f):
             print("Has a specific relic and win ratio on all ascensions (only base game relics):")
             printHasSpecificRelicAndWinRatio(getHasSpecificRelicAndWinRatio(None, None), True, sortByPrefix)
             for ascRange in ascRanges:
@@ -1306,7 +1307,7 @@ try:
                 print("Has a specific relic and win ratio on ascensions " + stringFromAscRange(ascRange) + ":")
                 printHasSpecificRelicAndWinRatio(getHasSpecificRelicAndWinRatio(ascRange, None), False, sortByPrefix)
             if len(characterKeys) > 1:
-                with open("report/" + fileName + "_by_characters.txt", "w") as f, redirect_stdout(f):
+                with open("report/" + fileName + "_by_characters.txt", "w", encoding="utf-8") as f, redirect_stdout(f):
                     for character in sorted(characterKeys):
                         print("Has a specific relic and win ratio and win ratio on character " + character + " on all ascensions:")
                         printHasSpecificRelicAndWinRatio(
@@ -1331,14 +1332,14 @@ try:
     printHasSpecificRelicAndWinRatioForRuns("15_has_a_specific_relic_and_win_ratio", False)
     printHasSpecificRelicAndWinRatioForRuns("16_has_a_specific_relic_and_win_ratio_sorted_by_prefix", True)
 
-    with open("report/17_average_damage_taken.txt", "w") as f, redirect_stdout(f):
+    with open("report/17_average_damage_taken.txt", "w", encoding="utf-8") as f, redirect_stdout(f):
         print("Average damage taken on all ascensions:")
         printAverageDamageTaken(getAverageDamageTaken(None, None))
         for ascRange in ascRanges:
             print("Average damage taken on ascensions " + stringFromAscRange(ascRange) + ":")
             printAverageDamageTaken(getAverageDamageTaken(ascRange, None))
         if len(characterKeys) > 1:
-            with open("report/17_average_damage_taken_by_characters.txt", "w") as f, redirect_stdout(f):
+            with open("report/17_average_damage_taken_by_characters.txt", "w", encoding="utf-8") as f, redirect_stdout(f):
                 for character in sorted(characterKeys):
                     print("Average damage taken on character " + character + " on all ascensions:")
                     printAverageDamageTaken(getAverageDamageTaken(None, character))
@@ -1346,14 +1347,14 @@ try:
                         print("Average damage taken on character " + character + " on ascensions " + stringFromAscRange(ascRange) + ":")
                         printAverageDamageTaken(getAverageDamageTaken(ascRange, character))
 
-    with open("report/18_average_combat_length.txt", "w") as f, redirect_stdout(f):
+    with open("report/18_average_combat_length.txt", "w", encoding="utf-8") as f, redirect_stdout(f):
         print("Average combat length on all ascensions:")
         printAverageCombatLength(getAverageCombatLength(None, None))
         for ascRange in ascRanges:
             print("Average combat length on ascensions " + stringFromAscRange(ascRange) + ":")
             printAverageCombatLength(getAverageCombatLength(ascRange, None))
         if len(characterKeys) > 1:
-            with open("report/18_average_combat_length_by_characters.txt", "w") as f, redirect_stdout(f):
+            with open("report/18_average_combat_length_by_characters.txt", "w", encoding="utf-8") as f, redirect_stdout(f):
                 for character in sorted(characterKeys):
                     print("Average combat length on character " + character + " on all ascensions:")
                     printAverageCombatLength(getAverageCombatLength(None, character))
@@ -1361,14 +1362,14 @@ try:
                         print("Average combat length on character " + character + " on ascensions " + stringFromAscRange(ascRange) + ":")
                         printAverageCombatLength(getAverageCombatLength(ascRange, character))
 
-    with open("report/19_killed_by.txt", "w") as f, redirect_stdout(f):
+    with open("report/19_killed_by.txt", "w", encoding="utf-8") as f, redirect_stdout(f):
         print("Killed by on all ascensions:")
         printKilledBy(getKilledBy(None, None))
         for ascRange in ascRanges:
             print("Killed by on ascensions " + stringFromAscRange(ascRange) + ":")
             printKilledBy(getKilledBy(ascRange, None))
         if len(characterKeys) > 1:
-            with open("report/19_killed_by_by_characters.txt", "w") as f, redirect_stdout(f):
+            with open("report/19_killed_by_by_characters.txt", "w", encoding="utf-8") as f, redirect_stdout(f):
                 for character in sorted(characterKeys):
                     print("Killed by on character " + character + " on all ascensions:")
                     printKilledBy(getKilledBy(None, character))
@@ -1378,7 +1379,7 @@ try:
 
     def printSwappedStarterRelicSortedBy(fileName, keyLambda):
         global swappedDict
-        with open("report/" + fileName + ".txt", "w") as f, redirect_stdout(f):
+        with open("report/" + fileName + ".txt", "w", encoding="utf-8") as f, redirect_stdout(f):
             print("Swapped starter relic on all ascensions:", end=" ")
             printSwappedStarterRelic(getSwappedStarterRelic(None, None))
             print()
@@ -1394,7 +1395,7 @@ try:
                 printSwappedStarterRelic(swapped)
             print()
             if len(characterKeys) > 1:
-                with open("report/" + fileName + "_by_characters.txt", "w") as f, redirect_stdout(f):
+                with open("report/" + fileName + "_by_characters.txt", "w", encoding="utf-8") as f, redirect_stdout(f):
                     swappedDict = {}
                     for character in characterKeys:
                         swappedDict[character] = getSwappedStarterRelic(None, character)
@@ -1430,14 +1431,14 @@ try:
         lambda e: -swappedDict[e]["difference"] if swappedDict[e]["difference"] is not None else 0,
     )
 
-    with open("report/22_hosts.txt", "w") as f, redirect_stdout(f):
+    with open("report/22_hosts.txt", "w", encoding="utf-8") as f, redirect_stdout(f):
         print("Hosts on all ascensions:")
         printHosts(getHosts(None, None))
         for ascRange in ascRanges:
             print("Hosts on ascensions " + stringFromAscRange(ascRange) + ":")
             printHosts(getHosts(ascRange, None))
         if len(characterKeys) > 1:
-            with open("report/22_hosts_by_characters.txt", "w") as f, redirect_stdout(f):
+            with open("report/22_hosts_by_characters.txt", "w", encoding="utf-8") as f, redirect_stdout(f):
                 for character in sorted(characterKeys):
                     print("Hosts on character " + character + " on all ascensions:")
                     printHosts(getHosts(None, character))
@@ -1445,14 +1446,14 @@ try:
                         print("Hosts on character " + character + " on ascensions " + stringFromAscRange(ascRange) + ":")
                         printHosts(getHosts(ascRange, character))
 
-    with open("report/23_language.txt", "w") as f, redirect_stdout(f):
+    with open("report/23_language.txt", "w", encoding="utf-8") as f, redirect_stdout(f):
         print("Language on all ascensions:")
         printLanguage(getLanguage(None, None))
         for ascRange in ascRanges:
             print("Language on ascensions " + stringFromAscRange(ascRange) + ":")
             printLanguage(getLanguage(ascRange, None))
         if len(characterKeys) > 1:
-            with open("report/23_language_by_characters.txt", "w") as f, redirect_stdout(f):
+            with open("report/23_language_by_characters.txt", "w", encoding="utf-8") as f, redirect_stdout(f):
                 for character in sorted(characterKeys):
                     print("Language on character " + character + " on all ascensions:")
                     printLanguage(getLanguage(None, character))
@@ -1460,14 +1461,14 @@ try:
                         print("Language on character " + character + " on ascensions " + stringFromAscRange(ascRange) + ":")
                         printLanguage(getLanguage(ascRange, character))
 
-    with open("report/24_acts_visited.txt", "w") as f, redirect_stdout(f):
+    with open("report/24_acts_visited.txt", "w", encoding="utf-8") as f, redirect_stdout(f):
         print("Acts visited on all ascensions:")
         printActsVisited(getActsVisited(None, None))
         for ascRange in ascRanges:
             print("Acts visited on ascensions " + stringFromAscRange(ascRange) + ":")
             printActsVisited(getActsVisited(ascRange, None))
         if len(characterKeys) > 1:
-            with open("report/24_acts_visited_by_characters.txt", "w") as f, redirect_stdout(f):
+            with open("report/24_acts_visited_by_characters.txt", "w", encoding="utf-8") as f, redirect_stdout(f):
                 for character in sorted(characterKeys):
                     print("Acts visited on character " + character + " on all ascensions:")
                     printActsVisited(getActsVisited(None, character))
