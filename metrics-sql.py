@@ -359,7 +359,7 @@ def printHasSpecificRelicAndWinRatio(hasSpecificRelicAndWinRatio, onlyBaseGameRe
     def relicPrefix(relicId):
         array = relicId.split(":")
         if len(array) == 1:
-            return "unknown"
+            return "Unknown"
         else:
             return array[0]
 
@@ -368,7 +368,7 @@ def printHasSpecificRelicAndWinRatio(hasSpecificRelicAndWinRatio, onlyBaseGameRe
         for relicKey, relicValue in hasSpecificRelicAndWinRatio.items():
             prefixes.add(relicPrefix(relicKey))
     else:
-        prefixes = ("unknown",)
+        prefixes = ("Unknown",)
 
     if onlyBaseGameRelics:
         rarities = {
@@ -381,11 +381,11 @@ def printHasSpecificRelicAndWinRatio(hasSpecificRelicAndWinRatio, onlyBaseGameRe
             "Special": BASE_GAME_SPECIAL_RELICS,
         }
     else:
-        rarities = {"unknown": []}
+        rarities = {"Unknown": []}
 
     for prefix in sorted(prefixes):
         for rarityKey, rarityList in rarities.items():
-            if rarityKey != "unknown":
+            if rarityKey != "Unknown":
                 print()
                 print(rarityKey)
             for relicKey, relicValue in sorted(
@@ -846,8 +846,8 @@ try:
 
                 character = runJson["event"]["character_chosen"]
                 asc = runJson["event"]["ascension_level"]
-                host = runJson["host"] if "host" in runJson else "unknown"
-                language = runJson["event"]["language"] if "language" in runJson["event"] else "unknown"
+                host = runJson["host"] if "host" in runJson and not runJson["event"]["is_beta"] else "Unknown"
+                language = runJson["event"]["language"] if "language" in runJson["event"] else "Unknown"
                 victory = runJson["event"]["victory"]
                 playTime = runJson["event"]["playtime"]
                 neowBonus = runJson["event"]["neow_bonus"]
