@@ -9,13 +9,16 @@ import argparse
 
 import psycopg2
 
+def str2bool(v):
+    return v.lower() in ("yes", "true", "t", "1")
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--METRICS_PATH", type=str, required=True)
 parser.add_argument("--DATABASE", type=str, required=True)
 parser.add_argument("--DATABASE_USER", type=str, required=True)
 parser.add_argument("--DATABASE_PASSWORD", type=str, required=True)
-parser.add_argument("--FIND_NEW_RUNS_TO_PROCESS", type=bool, required=False, default=False)
-parser.add_argument("--PROCESS_RUNS", type=bool, required=False, default=False)
+parser.add_argument("--FIND_NEW_RUNS_TO_PROCESS", type=str2bool, required=False, default=False)
+parser.add_argument("--PROCESS_RUNS", type=str2bool, required=False, default=False)
 parser.add_argument("--AVERAGE_DAMAGE_TAKEN_COUNT_THRESHOLD", type=int, required=False, default=5)
 parser.add_argument("--CARD_CHOICES_CARDS_THRESHOLD", type=int, required=False, default=5)
 parser.add_argument("--CHARACTER_GAMES_THRESHOLD", type=int, required=False, default=5)
