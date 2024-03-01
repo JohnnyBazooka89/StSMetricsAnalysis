@@ -9,8 +9,10 @@ import argparse
 
 import psycopg2
 
+
 def str2bool(v):
     return v.lower() in ("yes", "true", "t", "1")
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--METRICS_PATH", type=str, required=True)
@@ -740,9 +742,9 @@ def getSwappedStarterRelic(asc, character):
         "swappedAndLost": swappedAndLost,
         "won": won,
         "lost": lost,
-        "difference": None
-        if (swappedAndWon + swappedAndLost == 0) or (won + lost == 0)
-        else ((swappedAndWon / (swappedAndWon + swappedAndLost)) - (won / (won + lost))),
+        "difference": (
+            None if (swappedAndWon + swappedAndLost == 0) or (won + lost == 0) else ((swappedAndWon / (swappedAndWon + swappedAndLost)) - (won / (won + lost)))
+        ),
     }
 
 
