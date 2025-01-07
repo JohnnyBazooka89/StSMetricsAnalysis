@@ -1253,10 +1253,7 @@ try:
 
     def printIsSpecificCardInDeckAndWinRatioForRuns(fileName, upgradedCardsGrouped, runsString):
         # It doesn't really make sense to show it without specifying a character
-        with open(
-            "report/" + fileName + ".txt",
-            "w",
-        ) as f, redirect_stdout(f):
+        with open("report/" + fileName + ".txt", "w", encoding="utf-8") as f, redirect_stdout(f):
             for character in sorted(characterKeys):
                 print(runsString + " and win ratio on character " + character + " on all ascensions:")
                 printIsSpecificCardInDeckAndWinRatio(getIsSpecificCardInDeckAndWinRatio(None, character, upgradedCardsGrouped))
@@ -1277,10 +1274,7 @@ try:
 
     def printNumberOfSpecificCardsAndWinRatioForRuns(fileName, upgradedCardsGrouped, runsString):
         # It doesn't really make sense to show it without specifying a character
-        with open(
-            "report/" + fileName + ".txt",
-            "w",
-        ) as f, redirect_stdout(f):
+        with open("report/" + fileName + ".txt", "w", encoding="utf-8") as f, redirect_stdout(f):
             for character in sorted(characterKeys):
                 print(runsString + " and win ratio on character " + character + " on all ascensions:")
                 printNumberOfSpecificCardsAndWinRatio(getNumberOfSpecificCardsAndWinRatio(None, character, upgradedCardsGrouped))
